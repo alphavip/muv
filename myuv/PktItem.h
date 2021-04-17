@@ -9,6 +9,7 @@
 //不能
 struct PktItem
 {
+friend class NetConn;
 public:
     // 获取读取地址
     uint8_t* GetReadAddr() {

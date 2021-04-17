@@ -54,7 +54,7 @@ void allocBuf(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
     NetConn *pconn = (NetConn *)handle->data;
     PktItem* pkt = pconn->OnReadAlloc();
 
-    buf->base = (char *)pkt->GetReadAddr();
+    buf->base = (char *)pkt->GetWriteAddr();
     buf->len = pkt->GetCanWriteCount();
 }
 
@@ -87,7 +87,9 @@ void afterRead(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
     }
     if (nc != nullptr)
     {
-        nc->OnReadAfter();
+        //从开头开始写入的,还没加
+        assert(buf->base == (char *)nc->m_currReadPkt->GetWriteAddr());
+        nc->OnReadAfter((size_t)nread);
         while (nc->m_handler->OnData(*nc));
     }
 }

@@ -21,7 +21,7 @@ public:
     virtual ~NetConn();
 
 public:
-    void OnReadAfter();
+    void OnReadAfter(size_t nread);
     PktItem *OnReadAlloc()
     {
         this->m_currReadPkt = this->m_pktItemPool->Get();

@@ -6,8 +6,9 @@
 #include "PktItem.h"
 #include "NetConn.h"
 
-void NetConn::OnReadAfter()
+void NetConn::OnReadAfter(size_t nread)
 {
+    this->m_currReadPkt->write += nread;
     if(m_tail != nullptr)
     {
         this->m_tail->nextPkt = m_currReadPkt;
