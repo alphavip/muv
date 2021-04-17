@@ -1,17 +1,17 @@
 project(myuv)
 
-set(files Loop.h
+set(myuvfiles 
+          Loop.h
           Loop.cpp
           NetConn.h
           NetConn.cpp
           NetHandler.h
           PktItem.h
           PktItem.cpp
-          MemPool.h
-          Main.cpp)
+          MemPool.h)
 
-include_directories(../include)
+add_library(myuv_a STATIC ${myuvfiles})
+target_link_libraries(myuv_a uv_a)
 
-add_executable(myuv ${files})
-
-target_link_libraries(myuv uv_a)
+add_executable(myuv Main.cpp)
+target_link_libraries(myuv myuv_a)
