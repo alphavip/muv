@@ -12,6 +12,7 @@ public:
     virtual bool OnAccept(NetConn &conn) { return true; }
     //这个版本先把conn裸漏出去吧
     virtual bool OnData(NetConn& conn) { return false; }
+    virtual void OnBuffRelease(uint8_t* data) {}
     virtual void OnClose(NetConn &conn, long error) {}
 };
 

@@ -18,7 +18,7 @@ struct NetConn
 {
 public:
     NetConn(uint32_t sid, PktItemPool *pktpool, NetHandler* phandler) : sessionId(sid), m_pktItemPool(pktpool), m_handler(phandler){}
-    virtual ~NetConn();
+    ~NetConn();
 
 public:
     void OnReadAfter(size_t nread);

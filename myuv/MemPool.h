@@ -48,7 +48,7 @@ public:
         }
     }
 
-private:
+public:
     static inline T *Alloc(size_t sz)
     {
         return static_cast<T*>(malloc(sz));
