@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <memory.h>
 #include <strings.h>
+#include <iostream> 
 
 #include "PktItem.h"
 #include "NetConn.h"
@@ -45,7 +46,6 @@ uint32_t pkt_len(PktItem *pkt)
 void NetConn::CopyAndDrain(uint32_t len, uint8_t *buf)
 {
     assert(this->GetReadLen() >= len);
-    
     uint32_t count = len;
     uint32_t hasread = 0;
     auto *pwalker = this->m_head;
@@ -54,13 +54,14 @@ void NetConn::CopyAndDrain(uint32_t len, uint8_t *buf)
         if (pwalker->GetCanReadCount() >= count)
         {
             memcpy(buf + hasread, pwalker->GetReadAddr(), count);
-            pwalker->read += count;           
+            pwalker->read += count;
             break;
         }
         else
         {
             auto *ptmp = pwalker->nextPkt;
             memcpy(buf + hasread, pwalker->GetReadAddr(), pwalker->GetCanReadCount());
+            hasread += pwalker->GetCanReadCount();
             count -= pwalker->GetCanReadCount();
             this->m_pktItemPool->Cycle(pwalker);
             pwalker = ptmp;
@@ -100,6 +101,7 @@ void NetConn::CopyOut(uint32_t len, uint8_t* buf)
         {
             auto* ptmp = pwalker->nextPkt;
             memcpy(buf + hasread, pwalker->GetReadAddr(), pwalker->GetCanReadCount());
+            hasread += pwalker->GetCanReadCount();
             count -= pwalker->GetCanReadCount();
             pwalker = ptmp;
         }
