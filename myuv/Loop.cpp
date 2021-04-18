@@ -9,6 +9,8 @@
 #include "uv.h"
 #include "Loop.h"
 
+#define SessionIndex(sessionId) (sessionId & 0xFFFFF)
+
 void WriteData::DecRef()
 {
     assert(ref > 0);
@@ -27,7 +29,7 @@ bool NetLoop::Init()
     this->uvconns.resize(InitTcpConns);
     for (uint32_t i = 0; i < this->uvconns.size(); ++i)
     {
-        this->uvconns[i] = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
+        this->uvconns[i] = (uv_tcp_t *)malloc(sizeof(uv_tcp_t));
         freeslots.insert(i);
     }
 
@@ -36,7 +38,6 @@ bool NetLoop::Init()
 
 void NetLoop::UnInit()
 {
-
 }
 
 void NetLoop::Start()
@@ -52,7 +53,7 @@ void NetLoop::Stop()
 void allocBuf(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
 {
     NetConn *pconn = (NetConn *)handle->data;
-    PktItem* pkt = pconn->OnReadAlloc();
+    PktItem *pkt = pconn->OnReadAlloc();
 
     buf->base = (char *)pkt->GetWriteAddr();
     buf->len = pkt->GetCanWriteCount();
@@ -60,7 +61,7 @@ void allocBuf(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
 
 void writeCallBack(uv_write_t *req, int status)
 {
-    WriteData* pwd = (WriteData*)req->data;
+    WriteData *pwd = (WriteData *)req->data;
     pwd->ploop->writeReqPool.Cycle(req);
     pwd->DecRef();
 }
@@ -68,8 +69,17 @@ void writeCallBack(uv_write_t *req, int status)
 void closeCallBack(uv_handle_t *handle)
 {
     NetConn *pconn = (NetConn *)handle->data;
-    NetLoop* ploop = (NetLoop *)handle->loop->data;
-    ploop->Cycle(pconn);
+    if (pconn != nullptr)
+    {
+        NetLoop *ploop = (NetLoop *)handle->loop->data;
+        ploop->freeslots.insert(SessionIndex(pconn->sessionId));
+        ploop->Cycle(pconn);
+    }
+}
+
+void closeFree(uv_handle_t *handle)
+{
+    free(handle);
 }
 
 void afterRead(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
@@ -79,7 +89,7 @@ void afterRead(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
     {
         if (nc != nullptr)
         {
-            nc->m_handler->OnClose(*nc, nread);
+            nc->m_handler->OnClose(nc->sessionId, nread);
         }
 
         uv_close((uv_handle_t *)stream, closeCallBack);
@@ -126,37 +136,49 @@ void onConnections(uv_stream_t *server, int status)
     }
 
     if (uv_accept(server, (uv_stream_t *)uvclient) != 0)
+    {
+        ploop->freeslots.insert(session);
         return;
-
+    }
     ++ploop->sessionSeq;
     if (ploop->sessionSeq == 0)
         ++ploop->sessionSeq;
     session |= session |= (ploop->sessionSeq << 20);
 
-    SeverContext* sc = (SeverContext*)(server->data);
-    auto* pktpool = &(ploop->pktPool);
+    SeverContext *sc = (SeverContext *)(server->data);
+    auto *pktpool = &(ploop->pktPool);
     NetConn *pconn = ploop->connDataPool.Get(session, pktpool, sc->phandler);
     uvclient->data = pconn;
-    pconn->m_handler->OnAccept(*pconn);
-    
 
     if (uv_read_start((uv_stream_t *)uvclient, allocBuf, afterRead) != 0)
+    {
+        uv_close((uv_handle_t *)uvclient, closeCallBack);
         return;
+    }
+
+    pconn->m_handler->OnAccept(*pconn);
 }
 
-int32_t NetLoop::AddListener(const char *host, uint16_t port, NetHandler* pHandler)
+
+int32_t NetLoop::AddListener(const char *host, uint16_t port, NetHandler *pHandler)
 {
     struct sockaddr_in addr;
     int32_t r = uv_ip4_addr(host, port, &addr);
     if (r != 0)
         return r;
 
-    auto &svrContext = this->servers[port];
-    if (svrContext.uvserver != nullptr)
-        return -1;
+    auto it = this->servers.find(port);
+    if (it != this->servers.end())
+    {
+        auto &ll = it->second;
+        if (ll.uvserver != nullptr)
+            uv_close(reinterpret_cast<uv_handle_t *>(ll.uvserver), closeFree);
+        this->servers.erase(it);
+    }
 
+    auto& svrContext = this->servers[port];
     svrContext.phandler = pHandler;
-    svrContext.uvserver = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
+    svrContext.uvserver = (uv_tcp_t *)malloc(sizeof(uv_tcp_t));
     svrContext.uvserver->data = &svrContext;
 
     r = uv_tcp_init(this->uvloop, svrContext.uvserver);
@@ -184,12 +206,66 @@ int32_t NetLoop::AddListener(const char *host, uint16_t port, NetHandler* pHandl
     return 0;
 }
 
-#define SessionIndex(sessionId)  (sessionId & 0xFFFFF)
+void onconnect(uv_connect_t *req, int status)
+{
+    uv_tcp_t *uvclient = (uv_tcp_t *)(req->handle);
+    NetHandler *phandler = (NetHandler *)(req->data);
+    uint32_t session = (uint64_t)(uvclient->data);
+    if (status != 0)
+    {
+        phandler->OnClose(session, status);
 
-int32_t NetLoop::Send(uint32_t sesionId, uint8_t* data, uint16_t len)
+        return;
+    }
+
+    auto *ploop = (NetLoop *)uvclient->loop->data;
+    auto *pktpool = &(ploop->pktPool);
+    uvclient->data = ploop->connDataPool.Get(session, pktpool, phandler);
+    phandler->OnConnect(session);
+    if (uv_read_start((uv_stream_t *)uvclient, allocBuf, afterRead) != 0)
+    {
+        uv_close((uv_handle_t*)uvclient, closeCallBack);
+        return;
+    }
+}
+
+int32_t NetLoop::Connect(const char *host, uint16_t port, NetHandler *phandler)
+{
+    uint32_t session;
+    uv_tcp_t *uvclient;
+    if (this->freeslots.empty())
+    {
+        session = static_cast<uint32_t>(this->uvconns.size());
+        uvclient = (uv_tcp_t *)malloc(sizeof(uv_tcp_t));
+        this->uvconns.push_back(uvclient);
+    }
+    else
+    {
+        auto it = this->freeslots.begin();
+        session = static_cast<uint32_t>(*it);
+        assert(session < this->uvconns.size());
+        uvclient = this->uvconns[session];
+        this->freeslots.erase(it);
+    }
+    uv_tcp_init(this->uvloop, uvclient);
+
+    uv_connect_t *connect = (uv_connect_t *)malloc(sizeof(uv_connect_t));
+
+    struct sockaddr_in dest;
+    uv_ip4_addr(host, port, &dest);
+    connect->data = phandler;
+    uvclient->data = (void *)(uint64_t)session;
+    uv_tcp_connect(connect, uvclient, (const struct sockaddr *)&dest, onconnect);
+
+    return 0;
+}
+
+
+
+int32_t NetLoop::Send(uint32_t sesionId, uint8_t *data, uint16_t len)
 {
     uint32_t sindex = SessionIndex(sesionId);
-    if(sindex < this->uvconns.size())
+    if (sindex < this->uvconns.size())
     {
         uv_tcp_t *uvconn = this->uvconns[sindex];
 
@@ -197,10 +273,10 @@ int32_t NetLoop::Send(uint32_t sesionId, uint8_t* data, uint16_t len)
         if (nc == nullptr || nc->sessionId != sesionId)
             return -1;
         uv_write_t *wrq = writeReqPool.Get();
-        uv_buf_t uvbuf = uv_buf_init((char*)data, len);
+        uv_buf_t uvbuf = uv_buf_init((char *)data, len);
 
-        auto* ploop = this;
-        WriteData* pwd = this->writeDataPool.Get(ploop, data);
+        auto *ploop = this;
+        WriteData *pwd = this->writeDataPool.Get(ploop, data);
         wrq->data = pwd;
 
         pwd->AddRef();
@@ -210,3 +286,18 @@ int32_t NetLoop::Send(uint32_t sesionId, uint8_t* data, uint16_t len)
 
     return -1;
 }
+
+void NetLoop::CloseConn(uint32_t sessionId)
+{
+    uint32_t sindex = SessionIndex(sessionId);
+    if (sindex < this->uvconns.size())
+    {
+        uv_tcp_t *uvconn = this->uvconns[sindex];
+
+        NetConn *nc = reinterpret_cast<NetConn *>(uvconn->data);
+        if (nc == nullptr || nc->sessionId != sessionId)
+            return;
+        uv_close((uv_handle_t *)uvconn, closeCallBack);
+    }
+}
+

@@ -55,6 +55,7 @@ public:
 
 public:
     int32_t AddListener(const char* host, uint16_t port, NetHandler* phandler);
+    int32_t Connect(const char *host, uint16_t port, NetHandler *phandler);
 
 public:
     bool Init();
@@ -69,7 +70,7 @@ public:
 
 public:
     int32_t Send(uint32_t sessionId, uint8_t* data, uint16_t len);
-
+    void CloseConn(uint32_t sessionId);
 
 public:
     void Cycle(NetConn* conn) { this->connDataPool.Cycle(conn); }

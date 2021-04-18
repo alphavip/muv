@@ -60,13 +60,6 @@ private:
 //     return count;
 // }
 
-// uint32_t pkt_len(PktItem *pkt)
-// {
-//     uint32_t len = 0;
-//     for (auto *ptmp = pkt; ptmp != nullptr; ptmp = ptmp->nextPkt)
-//         len += ptmp->GetCanReadCount();
-//     return len;
-// }
 
 typedef MemPool<PktItem, 1024> PktItemPool;
 

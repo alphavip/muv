@@ -13,15 +13,15 @@ public:
     virtual ~TestHandler(){}
 
 public:
-    virtual bool OnAccept(NetConn &conn) { std::cout << "new client:" << conn.sessionId << std::endl; return true; }
-    virtual bool OnData(NetConn &conn) { 
+    void OnAccept(NetConn &conn) override { std::cout << "new client:" << conn.sessionId << std::endl; }
+    bool OnData(NetConn &conn) override { 
         uint8_t* buf = new uint8_t[13];
         memcpy(buf, "Hello World!\n", 13);
         loop.Send(conn.sessionId, buf, 13);
         return false;
     }
-    virtual void OnClose(NetConn &conn, long error) {
-        std::cout << "client close:" << conn.sessionId << "->" << error << std::endl;
+    void OnClose(uint32_t sessionId, int error) override {
+        std::cout << "client close:" << sessionId << "->" << error << std::endl;
     }
 };
 
