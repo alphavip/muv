@@ -100,7 +100,8 @@ void afterRead(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
         //从开头开始写入的,还没加
         assert(buf->base == (char *)nc->m_currReadPkt->GetWriteAddr());
         nc->OnReadAfter((size_t)nread);
-        while (nc->m_handler->OnData(*nc));
+        while (nc->m_handler->OnData(*nc))
+            ;
     }
 }
 
@@ -143,7 +144,7 @@ void onConnections(uv_stream_t *server, int status)
     ++ploop->sessionSeq;
     if (ploop->sessionSeq == 0)
         ++ploop->sessionSeq;
-    session |= session |= (ploop->sessionSeq << 20);
+    session |= (ploop->sessionSeq << 20);
 
     SeverContext *sc = (SeverContext *)(server->data);
     auto *pktpool = &(ploop->pktPool);
@@ -158,7 +159,6 @@ void onConnections(uv_stream_t *server, int status)
 
     pconn->m_handler->OnAccept(*pconn);
 }
-
 
 int32_t NetLoop::AddListener(const char *host, uint16_t port, NetHandler *pHandler)
 {
@@ -176,7 +176,7 @@ int32_t NetLoop::AddListener(const char *host, uint16_t port, NetHandler *pHandl
         this->servers.erase(it);
     }
 
-    auto& svrContext = this->servers[port];
+    auto &svrContext = this->servers[port];
     svrContext.phandler = pHandler;
     svrContext.uvserver = (uv_tcp_t *)malloc(sizeof(uv_tcp_t));
     svrContext.uvserver->data = &svrContext;
@@ -210,23 +210,26 @@ void onconnect(uv_connect_t *req, int status)
 {
     uv_tcp_t *uvclient = (uv_tcp_t *)(req->handle);
     NetHandler *phandler = (NetHandler *)(req->data);
+    auto *ploop = (NetLoop *)uvclient->loop->data;
     uint32_t session = (uint64_t)(uvclient->data);
     if (status != 0)
     {
+        uvclient->data = nullptr;
         phandler->OnClose(session, status);
-
+        ploop->freeslots.insert(SessionIndex(session));
         return;
     }
 
-    auto *ploop = (NetLoop *)uvclient->loop->data;
     auto *pktpool = &(ploop->pktPool);
     uvclient->data = ploop->connDataPool.Get(session, pktpool, phandler);
-    phandler->OnConnect(session);
+
     if (uv_read_start((uv_stream_t *)uvclient, allocBuf, afterRead) != 0)
     {
-        uv_close((uv_handle_t*)uvclient, closeCallBack);
+        uv_close((uv_handle_t *)uvclient, closeCallBack);
         return;
     }
+
+    phandler->OnConnect(session);
 }
 
 int32_t NetLoop::Connect(const char *host, uint16_t port, NetHandler *phandler)
@@ -259,8 +262,6 @@ int32_t NetLoop::Connect(const char *host, uint16_t port, NetHandler *phandler)
 
     return 0;
 }
-
-
 
 int32_t NetLoop::Send(uint32_t sesionId, uint8_t *data, uint16_t len)
 {
@@ -300,4 +301,3 @@ void NetLoop::CloseConn(uint32_t sessionId)
         uv_close((uv_handle_t *)uvconn, closeCallBack);
     }
 }
-
