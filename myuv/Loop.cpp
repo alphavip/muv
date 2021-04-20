@@ -263,6 +263,32 @@ int32_t NetLoop::Connect(const char *host, uint16_t port, NetHandler *phandler)
     return 0;
 }
 
+void ontimer(uv_timer_t *handle)
+{
+    
+}
+
+int32_t NetLoop::AddTimer(std::function<void(void *data)> &&callback, uint64_t firstinterval, uint64_t repeat, void *data)
+{
+    ++this->timerIndex;
+    uv_timer_t* uvtimer = (uv_timer_t*)malloc(sizeof(uv_timer_t));
+    uv_timer_init(this->uvloop, uvtimer);
+ 
+    uv_timer_start(uvtimer, ontimer, 0, 2000);
+    this->uvtimers[++this->timerIndex] = uvtimer;
+
+    return this->timerIndex;
+}
+
+void NetLoop::RemoveTimer(uint32_t timerId)
+{
+    auto it = this->uvtimers.find(timerId);
+    if(it != this->uvtimers.end())
+    {
+        uv_timer_stop(it->second);
+    }
+}
+
 int32_t NetLoop::Send(uint32_t sesionId, uint8_t *data, uint16_t len)
 {
     uint32_t sindex = SessionIndex(sesionId);

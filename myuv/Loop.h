@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <set>
 #include <vector>
+#include <functional>
 
 
 #include "uv.h"
@@ -58,6 +59,11 @@ public:
     int32_t Connect(const char *host, uint16_t port, NetHandler *phandler);
 
 public:
+    //return timerId 0:error 
+    int32_t AddTimer(std::function<void(void* data)>&& callback, uint64_t firstinterval, uint64_t repeat, void* data = nullptr);
+    void RemoveTimer(uint32_t timerId);
+
+public:
     bool Init();
     void UnInit();
 
@@ -79,17 +85,27 @@ public:
 
 public:
     uv_loop_t *uvloop = nullptr;
+    //listeners
     std::unordered_map<uint16_t, SeverContext> servers;
 
+    //连接对象池
     ConnPool connDataPool;
+    //read buffer对象池
     PktItemPool pktPool;
 
+    //写请求对象池
     MemPoolC<uv_write_t, 1024*4> writeReqPool;
+    //写对象池,存放了写请求的一些userdata
     MemPool<WriteData, 1024> writeDataPool;
 
+    //连接对象 session
     uint32_t sessionSeq = 0;
     std::vector<uv_tcp_t*> uvconns;
     std::set<uint32_t> freeslots;
+
+    //timer相关
+    uint32_t timerIndex = 0;
+    std::unordered_map<uint32_t, uv_timer_t *> uvtimers; //先用hash表存吧，是不是像tcp那样管理呢
 };
 
 
