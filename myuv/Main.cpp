@@ -22,7 +22,7 @@ public:
         memcpy(buf, strWelCome, strlen(strWelCome));
         conn.CopyAndDrain(conn.GetReadLen(), buf + strlen(strWelCome));
         loop.Send(conn.sessionId, buf, num);
-        delete buf;
+
         return false;
     }
     void OnClose(uint32_t sessionId, int error) override {
