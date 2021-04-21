@@ -13,7 +13,8 @@ public:
     virtual void OnAccept(NetConn &conn) {  }
     //这个版本先把conn裸漏出去吧
     virtual bool OnData(NetConn& conn) { return false; }
-    virtual void OnBuffRelease(uint8_t* data) {}
+    //用于释放发送的buffer 必须overide这个函数防止内存泄漏
+    virtual void OnWrited(void* data) = 0;
     virtual void OnClose(uint32_t sessionid, int error) {}
 };
 

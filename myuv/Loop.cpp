@@ -11,15 +11,12 @@
 
 #define SessionIndex(sessionId) (sessionId & 0xFFFFF)
 
-void WriteData::DecRef()
+bool WriteData::DecRef()
 {
     assert(ref > 0);
-    if (--ref == 0)
-    {
-        delete buff;
-        ploop->writeDataPool.Cycle(this);
-    }
+    return (--ref == 0);
 }
+
 
 bool NetLoop::Init()
 {
@@ -62,8 +59,17 @@ void allocBuf(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
 void writeCallBack(uv_write_t *req, int status)
 {
     WriteData *pwd = (WriteData *)req->data;
-    pwd->ploop->writeReqPool.Cycle(req);
-    pwd->DecRef();
+    auto *ploop = (NetLoop*)req->handle->loop->data;
+    NetConn *pconn = (NetConn *)req->handle->data;
+    ploop->writeReqPool.Cycle(req);
+
+    assert(pconn != nullptr);
+
+    if(pwd->DecRef())
+    {
+        pconn->m_handler->OnWrited(pwd->userdata);
+        ploop->writeDataPool.Cycle(pwd);
+    }
 }
 
 void closeCallBack(uv_handle_t *handle)
@@ -265,17 +271,24 @@ int32_t NetLoop::Connect(const char *host, uint16_t port, NetHandler *phandler)
 
 void ontimer(uv_timer_t *handle)
 {
-    
+    TimerData* td = (TimerData*)(handle->data);
+    td->calback(td->data);
+    //对于不repeat也由外部remove吧，底层不管理
 }
 
-int32_t NetLoop::AddTimer(std::function<void(void *data)> &&callback, uint64_t firstinterval, uint64_t repeat, void *data)
+
+
+int32_t NetLoop::AddTimer(std::function<void(void *data)> &callback, uint64_t firstinterval, uint64_t repeat, void *data)
 {
     ++this->timerIndex;
     uv_timer_t* uvtimer = (uv_timer_t*)malloc(sizeof(uv_timer_t));
     uv_timer_init(this->uvloop, uvtimer);
  
-    uv_timer_start(uvtimer, ontimer, 0, 2000);
+    uv_timer_start(uvtimer, ontimer, firstinterval, repeat);
     this->uvtimers[++this->timerIndex] = uvtimer;
+    auto* td = this->timerDataPool.Get(data, callback);
+
+    uvtimer->data = td;
 
     return this->timerIndex;
 }
@@ -286,11 +299,15 @@ void NetLoop::RemoveTimer(uint32_t timerId)
     if(it != this->uvtimers.end())
     {
         uv_timer_stop(it->second);
+        TimerData* td = (TimerData*)(it->second->data);
+        this->timerDataPool.Cycle(td);
     }
 }
 
-int32_t NetLoop::Send(uint32_t sesionId, uint8_t *data, uint16_t len)
+int32_t NetLoop::Send(uint32_t sesionId, uint8_t *data, uint16_t len, void* userData)
 {
+    if(userData == nullptr)
+        userData = data;
     uint32_t sindex = SessionIndex(sesionId);
     if (sindex < this->uvconns.size())
     {
@@ -303,7 +320,7 @@ int32_t NetLoop::Send(uint32_t sesionId, uint8_t *data, uint16_t len)
         uv_buf_t uvbuf = uv_buf_init((char *)data, len);
 
         auto *ploop = this;
-        WriteData *pwd = this->writeDataPool.Get(ploop, data);
+        WriteData *pwd = this->writeDataPool.Get(ploop, userData);
         wrq->data = pwd;
 
         pwd->AddRef();
@@ -324,6 +341,7 @@ void NetLoop::CloseConn(uint32_t sessionId)
         NetConn *nc = reinterpret_cast<NetConn *>(uvconn->data);
         if (nc == nullptr || nc->sessionId != sessionId)
             return;
+        uv_read_stop((uv_stream_t*)uvconn);
         uv_close((uv_handle_t *)uvconn, closeCallBack);
     }
 }

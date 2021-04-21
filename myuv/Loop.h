@@ -22,14 +22,22 @@ struct NetHandler;
 struct WriteData
 {
     NetLoop *ploop = nullptr;
-    uint8_t *buff = nullptr;
+    void *userdata = nullptr;
     uint32_t ref = 1;
 
-    WriteData(NetLoop* l, uint8_t* data) : ploop(l), buff(data){}
+    WriteData(NetLoop *l, void *data) : ploop(l), userdata(data) {}
 
     inline void AddRef() { ++ref; }
-    inline void DecRef();
+    inline bool DecRef();
 };
+
+struct TimerData
+{
+    void *data = nullptr;
+    std::function<void(void *data)> calback;
+    TimerData(void *d, std::function<void(void *data)>&f) : data(d), calback(f){}
+};
+
 
 //for listener user data
 struct SeverContext
@@ -60,8 +68,9 @@ public:
 
 public:
     //return timerId 0:error 
-    int32_t AddTimer(std::function<void(void* data)>&& callback, uint64_t firstinterval, uint64_t repeat, void* data = nullptr);
+    int32_t AddTimer(std::function<void(void* data)>& callback, uint64_t firstinterval, uint64_t repeat, void* data = nullptr);
     void RemoveTimer(uint32_t timerId);
+
 
 public:
     bool Init();
@@ -75,7 +84,7 @@ public:
     uv_loop_t* GetLoop() { return this->uvloop; }
 
 public:
-    int32_t Send(uint32_t sessionId, uint8_t* data, uint16_t len);
+    int32_t Send(uint32_t sessionId, uint8_t* buff, uint16_t len, void* userData = nullptr);
     void CloseConn(uint32_t sessionId);
 
 public:
@@ -106,6 +115,7 @@ public:
     //timer相关
     uint32_t timerIndex = 0;
     std::unordered_map<uint32_t, uv_timer_t *> uvtimers; //先用hash表存吧，是不是像tcp那样管理呢
+    MemPool<TimerData, 256> timerDataPool;
 };
 
 

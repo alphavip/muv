@@ -131,11 +131,13 @@ public:
     template <typename... TR>
     static inline T *Alloc(TR &... params)
     {
-        return new T(params...);
+        char* p = (char*)malloc(sizeof(T) + sizeof(int));
+        return new (p) T(params...);
     }
     static inline void Free(T *obj)
     {
-        delete obj;
+        char* p = (char*)obj;
+        free(p);
     }
 
 private:

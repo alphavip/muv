@@ -37,10 +37,14 @@ public:
 
 //for packet process
 public:
-    inline uint32_t GetReadLen() const { return this->m_readcount; }
+    inline uint32_t GetReadLen() { return this->m_readcount; }
+    //copy len data to buf
     void CopyOut(uint32_t len, uint8_t *buf);
+    //越过offset长度copy len到buf
+    void CopyOut(uint32_t len, uint32_t offset, uint8_t *buf);
     void CopyAndDrain(uint32_t len, uint8_t *buf);
     void Drain(uint32_t len);
+
 
 public:
     uint32_t remoteAddr;

@@ -83,6 +83,36 @@ void NetConn::CopyAndDrain(uint32_t len, uint8_t *buf)
     assert(this->m_readcount == pkt_len(m_head));
 }
 
+void NetConn::CopyOut(uint32_t len, uint32_t offset, uint8_t *buf)
+{
+    assert(this->GetReadLen() >= len + offset);
+
+    uint32_t count = len+offset;
+    uint32_t hasread = 0;
+    auto *pwalker = this->m_head;
+    for (; pwalker != nullptr; pwalker = pwalker->nextPkt)
+    {
+        uint32_t canRead = pwalker->GetCanReadCount();
+        if (canRead >= count)
+        {
+            memcpy(buf + hasread, pwalker->GetReadAddr()+offset, count-offset);
+            break;
+        }
+        else
+        {
+            count -= canRead;
+            if(offset > canRead)
+            {
+                offset -= canRead;
+                continue;
+            }
+            memcpy(buf + hasread, pwalker->GetReadAddr()+offset, canRead-offset);
+            offset = 0;
+            hasread += canRead-offset;
+        }
+    }
+}
+
 void NetConn::CopyOut(uint32_t len, uint8_t* buf)
 {
     assert(this->GetReadLen() >= len);
@@ -90,7 +120,7 @@ void NetConn::CopyOut(uint32_t len, uint8_t* buf)
     uint32_t count = len;
     uint32_t hasread = 0;
     auto *pwalker = this->m_head;
-    for (; pwalker != nullptr; )
+    for (; pwalker != nullptr; pwalker = pwalker->nextPkt)
     {
         if (pwalker->GetCanReadCount() >= count)
         {
@@ -99,11 +129,9 @@ void NetConn::CopyOut(uint32_t len, uint8_t* buf)
         }
         else
         {
-            auto* ptmp = pwalker->nextPkt;
             memcpy(buf + hasread, pwalker->GetReadAddr(), pwalker->GetCanReadCount());
             hasread += pwalker->GetCanReadCount();
             count -= pwalker->GetCanReadCount();
-            pwalker = ptmp;
         }
     }
 }
