@@ -36,7 +36,6 @@ public:
 
 int main()
 {
-    loop.Init();
     loop.AddListener("0.0.0.0", 8888, new TestHandler());
     loop.Start();
 

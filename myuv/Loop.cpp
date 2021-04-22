@@ -17,8 +17,23 @@ bool WriteData::DecRef()
     return (--ref == 0);
 }
 
+void closeCallBack(uv_handle_t *handle)
+{
+    NetConn *pconn = (NetConn *)handle->data;
+    if (pconn != nullptr)
+    {
+        NetLoop *ploop = (NetLoop *)handle->loop->data;
+        ploop->freeslots.insert(SessionIndex(pconn->sessionId));
+        ploop->Cycle(pconn);
+    }
+}
 
-bool NetLoop::Init()
+void closeFree(uv_handle_t *handle)
+{
+    free(handle);
+}
+
+NetLoop::NetLoop()
 {
     this->uvloop = uv_loop_new();
     this->uvloop->data = this;
@@ -29,12 +44,15 @@ bool NetLoop::Init()
         this->uvconns[i] = (uv_tcp_t *)malloc(sizeof(uv_tcp_t));
         freeslots.insert(i);
     }
-
-    return 0;
 }
 
-void NetLoop::UnInit()
+NetLoop::~NetLoop()
 {
+    delete this->uvloop;
+    for(auto& index : this->freeslots)
+    {
+        free(this->uvconns[index]);
+    }
 }
 
 void NetLoop::Start()
@@ -72,21 +90,6 @@ void writeCallBack(uv_write_t *req, int status)
     }
 }
 
-void closeCallBack(uv_handle_t *handle)
-{
-    NetConn *pconn = (NetConn *)handle->data;
-    if (pconn != nullptr)
-    {
-        NetLoop *ploop = (NetLoop *)handle->loop->data;
-        ploop->freeslots.insert(SessionIndex(pconn->sessionId));
-        ploop->Cycle(pconn);
-    }
-}
-
-void closeFree(uv_handle_t *handle)
-{
-    free(handle);
-}
 
 void afterRead(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {

@@ -59,8 +59,8 @@ struct SeverContext
 class NetLoop
 {
 public:
-    NetLoop(){}
-    ~NetLoop(){}
+    NetLoop();
+    ~NetLoop();
 
 public:
     int32_t AddListener(const char* host, uint16_t port, NetHandler* phandler);
@@ -71,10 +71,6 @@ public:
     int32_t AddTimer(std::function<void(void* data)>& callback, uint64_t firstinterval, uint64_t repeat, void* data = nullptr);
     void RemoveTimer(uint32_t timerId);
 
-
-public:
-    bool Init();
-    void UnInit();
 
 public:
     void Start();
