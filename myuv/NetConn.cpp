@@ -45,6 +45,8 @@ uint32_t pkt_len(PktItem *pkt)
 
 void NetConn::CopyAndDrain(uint32_t len, uint8_t *buf)
 {
+    if(len == 0)
+        return;
     assert(this->GetReadLen() >= len);
     uint32_t count = len;
     uint32_t hasread = 0;
@@ -85,6 +87,8 @@ void NetConn::CopyAndDrain(uint32_t len, uint8_t *buf)
 
 void NetConn::CopyOut(uint32_t len, uint32_t offset, uint8_t *buf)
 {
+    if(len == 0)
+        return;
     assert(this->GetReadLen() >= len + offset);
 
     uint32_t count = len+offset;
@@ -115,6 +119,8 @@ void NetConn::CopyOut(uint32_t len, uint32_t offset, uint8_t *buf)
 
 void NetConn::CopyOut(uint32_t len, uint8_t* buf)
 {
+    if(len == 0)
+        return;
     assert(this->GetReadLen() >= len);
 
     uint32_t count = len;

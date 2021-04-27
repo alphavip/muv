@@ -48,7 +48,13 @@ NetLoop::NetLoop()
 
 NetLoop::~NetLoop()
 {
-    delete this->uvloop;
+    for(auto& pair : this->servers)
+    {
+        uv_close(reinterpret_cast<uv_handle_t *>(pair.second.uvserver), closeFree);
+    }
+
+    uv_run(this->uvloop, UV_RUN_DEFAULT);
+    uv_loop_delete(this->uvloop);
     for(auto& index : this->freeslots)
     {
         free(this->uvconns[index]);
@@ -85,7 +91,8 @@ void writeCallBack(uv_write_t *req, int status)
 
     if(pwd->DecRef())
     {
-        pconn->m_handler->OnWrited(pwd->userdata);
+        if(pwd->userdata != nullptr)
+            pconn->m_handler->OnWrited(pwd->userdata);
         ploop->writeDataPool.Cycle(pwd);
     }
 }
