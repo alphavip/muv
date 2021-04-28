@@ -125,7 +125,7 @@ public:
         }
         else
         {
-            delete obj;
+            Free(obj);
         }
     }
     template <typename... TR>
