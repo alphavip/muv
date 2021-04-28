@@ -314,31 +314,37 @@ void NetLoop::RemoveTimer(uint32_t timerId)
     }
 }
 
-int32_t NetLoop::Send(uint32_t sesionId, uint8_t *data, uint16_t len, void* userData)
+void NetLoop::Send(uint32_t sesionId, uint8_t *data, uint16_t len, void* userData)
 {
     if(userData == nullptr)
         userData = data;
-    uint32_t sindex = SessionIndex(sesionId);
-    if (sindex < this->uvconns.size())
-    {
-        uv_tcp_t *uvconn = this->uvconns[sindex];
 
-        NetConn *nc = reinterpret_cast<NetConn *>(uvconn->data);
-        if (nc == nullptr || nc->sessionId != sesionId)
-            return -1;
-        uv_write_t *wrq = writeReqPool.Get();
-        uv_buf_t uvbuf = uv_buf_init((char *)data, len);
+    auto *ploop = this;
+    WriteData *pwd = this->writeDataPool.Get(ploop, userData);
 
-        auto *ploop = this;
-        WriteData *pwd = this->writeDataPool.Get(ploop, userData);
-        wrq->data = pwd;
+    do 
+    {    uint32_t sindex = SessionIndex(sesionId);
+        if (sindex < this->uvconns.size())
+        {
+            uv_tcp_t *uvconn = this->uvconns[sindex];
 
-        pwd->AddRef();
-        uv_write(wrq, (uv_stream_t *)uvconn, &uvbuf, 1, writeCallBack);
-        pwd->DecRef();
-    }
+            NetConn *nc = reinterpret_cast<NetConn *>(uvconn->data);
+            if (nc == nullptr || nc->sessionId != sesionId)
+            {
+                break;
+            }
+            uv_write_t *wrq = writeReqPool.Get();
+            uv_buf_t uvbuf = uv_buf_init((char *)data, len);
 
-    return -1;
+            wrq->data = pwd;
+
+            pwd->AddRef();
+            uv_write(wrq, (uv_stream_t *)uvconn, &uvbuf, 1, writeCallBack);
+        }
+    }while (false);
+    
+    pwd->DecRef();
+    return;
 }
 
 void NetLoop::CloseConn(uint32_t sessionId)

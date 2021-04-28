@@ -80,7 +80,7 @@ public:
     uv_loop_t* GetLoop() { return this->uvloop; }
 
 public:
-    int32_t Send(uint32_t sessionId, uint8_t* buff, uint16_t len, void* userData = nullptr);
+    void Send(uint32_t sessionId, uint8_t* buff, uint16_t len, void* userData = nullptr);
     void CloseConn(uint32_t sessionId);
 
 public:
