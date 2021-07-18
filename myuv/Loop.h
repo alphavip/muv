@@ -8,6 +8,8 @@
 #include <vector>
 #include <functional>
 
+#include "curl/curl.h"
+
 
 #include "uv.h"
 #include "NetConn.h"
@@ -30,6 +32,25 @@ struct WriteData
     inline void AddRef() { ++ref; }
     inline bool DecRef();
 };
+struct CurlData;
+typedef  std::function<void (int32_t, const CurlData& data)> CurlReqCB;
+struct CurlData
+{
+    CurlReqCB cb;
+    void* userData = nullptr;
+    char* resData = nullptr;
+    char* postData = nullptr;
+    size_t resSize = 0;
+};
+typedef MemPool<CurlData, 256> CurlDataPool; 
+
+struct CurlContext
+{
+  uv_poll_t poll_handle;
+  curl_socket_t sockfd;
+};
+
+typedef MemPoolC<CurlContext, 256> CurlContextPool;
 
 struct TimerData
 {
@@ -61,10 +82,12 @@ class NetLoop
 public:
     NetLoop();
     ~NetLoop();
+    int32_t InitMulitCulr();
 
 public:
     int32_t AddListener(const char* host, uint16_t port, NetHandler* phandler);
     int32_t Connect(const char *host, uint16_t port, NetHandler *phandler);
+    int32_t AddCurlReq(const char* url, const char* header, const char* post, CurlReqCB&& cb, void* userp);
 
 public:
     //return timerId 0:error 
@@ -107,6 +130,12 @@ public:
     uint32_t sessionSeq = 0;
     std::vector<uv_tcp_t*> uvconns;
     std::set<uint32_t> freeslots;
+
+    //libcurl
+    CURLM* multiHandler = nullptr;
+    uv_timer_t* curlTimer;
+    CurlDataPool curlDataPool;
+    CurlContextPool curlContextPool;
 
     //timer相关
     uint32_t timerIndex = 0;

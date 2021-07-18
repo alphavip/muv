@@ -36,8 +36,18 @@ public:
 
 int main()
 {
-    loop.AddListener("0.0.0.0", 8888, new TestHandler());
+    //loop.AddListener("0.0.0.0", 8888, new TestHandler());
+    loop.InitMulitCulr();
+    loop.AddCurlReq("www.baidu.com", nullptr, nullptr, [](int32_t ret, const CurlData& data)->void{
+        std::cout << "baidu:" << ret << std::endl;
+        //std::cout << std::string(data.resData, data.resSize) << std::endl;
+    }, nullptr); 
+    loop.AddCurlReq("192.168.1.1", nullptr, nullptr, [](int32_t ret, const CurlData& data)->void{
+        std::cout << "gate:" << ret << std::endl;
+        //std::cout << std::string(data.resData, data.resSize) << std::endl;
+    }, nullptr); 
     loop.Start();
+    loop.Stop();
 
     return 0;
 }

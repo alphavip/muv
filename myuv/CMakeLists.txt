@@ -11,8 +11,10 @@ set(myuvfiles
           PktItem.cpp
           MemPool.h)
 
+FIND_PACKAGE(CURL REQUIRED)
+
 add_library(myuv_a STATIC ${myuvfiles})
-target_link_libraries(myuv_a uv_a)
+target_link_libraries(myuv_a uv_a ${CURL_LIBRARIES})
 
 add_executable(myuv Main.cpp)
 target_link_libraries(myuv myuv_a)
