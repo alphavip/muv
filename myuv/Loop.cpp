@@ -36,7 +36,7 @@ void closeFree(uv_handle_t *handle)
 
 NetLoop::NetLoop()
 {
-    this->uvloop = uv_loop_new();
+    this->uvloop = uv_default_loop();
     this->uvloop->data = this;
 
     this->uvconns.resize(InitTcpConns);
@@ -164,7 +164,7 @@ static void closePollCB(uv_handle_t* handle)
 static void curlPerform(uv_poll_t *req, int status, int events)
 {
     NetLoop* ploop = (NetLoop *) req->loop->data;
-
+    //uv_timer_stop(ploop->curlTimer);
     int running_handles;
     int flags = 0;
     CurlContext *context = (CurlContext*)req->data;
@@ -184,10 +184,10 @@ static void curlPerform(uv_poll_t *req, int status, int events)
 static void curlUVTimeOut(uv_timer_t *req)
 {
     NetLoop* ploop = (NetLoop*) req->loop->data;
-
     int running_handles;
     curl_multi_socket_action(ploop->multiHandler, CURL_SOCKET_TIMEOUT, 0, &running_handles);
     check_multi_info(ploop);
+    std::cout << "timer out" << std::endl;
 }
  
 static int startTimeOut(CURLM *multi, long timeout_ms, void *userp)
@@ -223,6 +223,7 @@ static int32_t handleSocket(CURL *easyhandler, curl_socket_t s, int action, void
         if(socketp == nullptr)
         {
             context = ploop->curlContextPool.Get();
+            context->sockfd = s;
             uv_poll_init_socket(ploop->uvloop, &context->poll_handle, s);
             context->poll_handle.data = context;
             std::cout << "poll start " << s << ":" << action << std::endl;
