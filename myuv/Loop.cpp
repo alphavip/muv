@@ -59,11 +59,11 @@ NetLoop::~NetLoop()
     {
         free(this->uvconns[index]);
     }
-    
-    uv_close((uv_handle_t*)(curlTimer), closeFree);
+
     
     curl_multi_cleanup(this->multiHandler);
-
+    
+    uv_close((uv_handle_t*)(curlTimer), closeFree);
     uv_run(this->uvloop, UV_RUN_DEFAULT);
     uv_print_all_handles(this->uvloop, stderr);
     uv_loop_delete(this->uvloop);
@@ -109,7 +109,8 @@ int32_t NetLoop::AddCurlReq(const char* url, const char* header, const char* pos
 
     if(header != nullptr)
     {
-        struct curl_slist *headers = curl_slist_append(headers, header);
+        struct curl_slist *headers = nullptr;
+        headers = curl_slist_append(headers, header);
         curl_easy_setopt(handle, CURLOPT_HTTPHEADER, headers);
     }
 
@@ -137,14 +138,15 @@ static void check_multi_info(NetLoop* ploop)
             easy_handle = message->easy_handle;  
        
             curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &curlData);
-            curl_multi_remove_handle(ploop->multiHandler, easy_handle);
-            curl_easy_cleanup(easy_handle);
+
             if(curlData->cb)
                 curlData->cb(message->data.result, *curlData);
             if(curlData->postData != nullptr)
                 free(curlData->postData);
             if(curlData->resData != nullptr)
-                free(curlData->resData);;
+                free(curlData->resData);
+            curl_multi_remove_handle(ploop->multiHandler, easy_handle);
+            curl_easy_cleanup(easy_handle);
             ploop->curlDataPool.Cycle(curlData);
 
             break;    
@@ -158,7 +160,7 @@ static void check_multi_info(NetLoop* ploop)
 static void closePollCB(uv_handle_t* handle)
 {
     ((NetLoop*)handle->loop->data)->curlContextPool.Cycle((CurlContext*)handle->data);
-    std::cout << "close poll" << std::endl;
+    //std::cout << "close poll" << std::endl;
 }
  
 static void curlPerform(uv_poll_t *req, int status, int events)
@@ -187,7 +189,7 @@ static void curlUVTimeOut(uv_timer_t *req)
     int running_handles;
     curl_multi_socket_action(ploop->multiHandler, CURL_SOCKET_TIMEOUT, 0, &running_handles);
     check_multi_info(ploop);
-    std::cout << "timer out" << std::endl;
+    //std::cout << "timer out" << std::endl;
 }
  
 static int startTimeOut(CURLM *multi, long timeout_ms, void *userp)
@@ -196,14 +198,14 @@ static int startTimeOut(CURLM *multi, long timeout_ms, void *userp)
     if(timeout_ms < 0)
     {
         uv_timer_stop(ploop->curlTimer);
-        std::cout << "stop timer" << std::endl;
+        //std::cout << "stop timer" << std::endl;
     }
     else 
     {
         if(timeout_ms == 0)
             timeout_ms = 1; /* 0 means directly call socket_action, but we'll do it in a bit */
         uv_timer_start(ploop->curlTimer, curlUVTimeOut, timeout_ms, 0);
-        std::cout << "start timer" << std::endl;
+        //std::cout << "start timer" << std::endl;
     }
     return 0;
 }
@@ -226,7 +228,7 @@ static int32_t handleSocket(CURL *easyhandler, curl_socket_t s, int action, void
             context->sockfd = s;
             uv_poll_init_socket(ploop->uvloop, &context->poll_handle, s);
             context->poll_handle.data = context;
-            std::cout << "poll start " << s << ":" << action << std::endl;
+            //std::cout << "poll start " << s << ":" << action << std::endl;
         }
         else
         {
