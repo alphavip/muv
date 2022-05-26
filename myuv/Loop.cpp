@@ -60,10 +60,6 @@ NetLoop::~NetLoop()
         free(this->uvconns[index]);
     }
 
-    
-    curl_multi_cleanup(this->multiHandler);
-    
-    uv_close((uv_handle_t*)(curlTimer), closeFree);
     uv_run(this->uvloop, UV_RUN_DEFAULT);
     uv_print_all_handles(this->uvloop, stderr);
     uv_loop_delete(this->uvloop);

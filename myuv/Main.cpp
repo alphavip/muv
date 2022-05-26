@@ -5,7 +5,7 @@
 #include "NetConn.h"
 #include "NetHandler.h"
 
-
+NetLoop loop;
 
 class TestHandler : public NetHandler
 {
@@ -36,7 +36,7 @@ public:
 
 int main()
 {
-    NetLoop loop;
+
     loop.AddListener("0.0.0.0", 8888, new TestHandler());
 
     

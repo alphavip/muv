@@ -8,8 +8,6 @@
 #include <vector>
 #include <functional>
 
-#include "curl/curl.h"
-
 
 #include "uv.h"
 #include "NetConn.h"
@@ -111,10 +109,6 @@ public:
     uint32_t sessionSeq = 0;
     std::vector<uv_tcp_t*> uvconns;
     std::set<uint32_t> freeslots;
-
-    //libcurl
-    CURLM* multiHandler = nullptr;
-    uv_timer_t* curlTimer;
 
     //timer相关
     uint32_t timerIndex = 0;
